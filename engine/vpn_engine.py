@@ -181,7 +181,14 @@ def stun_discover(local_port: int = 0) -> STUNResult:
 # ─── WireGuard Interface Manager ───────────────────────────────────────────────
 
 class WireGuardManager:
-    """Manages WireGuard tunnel interface on Windows."""
+    """Manages WireGuard tunnel interface on Windows.
+
+    Hub-and-spoke topology: the only [Peer] entry written to the local
+    tunnel config is the GameVPN relay hub. All virtual-LAN traffic
+    (10.10.0.0/24) is routed through the hub, which forwards between
+    peers. This bypasses NAT problems (symmetric, CGNAT) that would
+    otherwise break direct P2P.
+    """
 
     def __init__(self, interface_name: str = "GameVPN"):
         self.interface_name = interface_name
@@ -191,6 +198,12 @@ class WireGuardManager:
         self.keys = WireGuardKeys.generate()
         self.is_running = False
         self.peers: dict[str, dict] = {}
+        self.hub_public_key: str = ""
+        self.hub_endpoint: str = ""
+
+    def set_hub(self, public_key: str, endpoint: str):
+        self.hub_public_key = public_key
+        self.hub_endpoint = endpoint
 
     def _find_wireguard(self) -> Optional[str]:
         """Find WireGuard installation path on Windows."""
@@ -215,30 +228,28 @@ class WireGuardManager:
         return None
 
     def generate_config(self, local_ip: str, listen_port: int = 51820) -> str:
-        """Generate WireGuard configuration file content."""
-        config = f"""[Interface]
-PrivateKey = {self.keys.private_key}
-Address = {local_ip}/24
-ListenPort = {listen_port}
-"""
-        for peer_id, peer_info in self.peers.items():
-            allowed_ips = peer_info.get("local_ip", "10.10.0.0") + "/32"
-            endpoint = peer_info.get("endpoint", "")
-            public_key = peer_info.get("public_key", "")
+        """Generate WireGuard configuration file content (hub-and-spoke).
 
-            if not public_key:
-                continue
-
-            config += f"""
-[Peer]
-PublicKey = {public_key}
-AllowedIPs = {allowed_ips}
-"""
-            if endpoint:
-                config += f"Endpoint = {endpoint}\n"
-            config += "PersistentKeepalive = 25\n"
-
-        return config
+        The only Peer is the relay hub. AllowedIPs = 10.10.0.0/24 means
+        every packet destined for the virtual LAN goes to the hub, which
+        forwards it to the correct peer.
+        """
+        if not self.hub_public_key or not self.hub_endpoint:
+            raise RuntimeError(
+                "Hub info not set. Call set_hub() before starting the tunnel."
+            )
+        return (
+            "[Interface]\n"
+            f"PrivateKey = {self.keys.private_key}\n"
+            f"Address = {local_ip}/24\n"
+            f"ListenPort = {listen_port}\n"
+            "\n"
+            "[Peer]\n"
+            f"PublicKey = {self.hub_public_key}\n"
+            f"Endpoint = {self.hub_endpoint}\n"
+            "AllowedIPs = 10.10.0.0/24\n"
+            "PersistentKeepalive = 25\n"
+        )
 
     def write_config(self, local_ip: str, listen_port: int = 51820):
         """Write WireGuard config to file."""
@@ -248,19 +259,24 @@ AllowedIPs = {allowed_ips}
         return self.config_path
 
     def add_peer(self, peer_id: str, public_key: str, endpoint: str, local_ip: str):
-        """Add a peer to the WireGuard configuration."""
+        """Track a peer locally for UI / ping purposes.
+
+        In hub-and-spoke mode the tunnel config is NOT touched -- routing for
+        all 10.10.0.x addresses already goes via the hub. This dict is kept so
+        the GUI can list peers and the ping timer can probe them.
+        """
         self.peers[peer_id] = {
             "public_key": public_key,
             "endpoint": endpoint,
             "local_ip": local_ip,
         }
-        logger.info(f"Added peer {peer_id[:8]} ({local_ip}) endpoint={endpoint}")
+        logger.info(f"Tracking peer {peer_id[:8]} ({local_ip}) - routed via hub")
 
     def remove_peer(self, peer_id: str):
-        """Remove a peer from the WireGuard configuration."""
+        """Untrack a peer locally."""
         if peer_id in self.peers:
             del self.peers[peer_id]
-            logger.info(f"Removed peer {peer_id[:8]}")
+            logger.info(f"Untracking peer {peer_id[:8]}")
 
     def start_tunnel(self, local_ip: str, listen_port: int = 51820) -> bool:
         """Start WireGuard tunnel."""
@@ -305,12 +321,13 @@ AllowedIPs = {allowed_ips}
             return False
 
     def reload_config(self, local_ip: str, listen_port: int = 51820) -> bool:
-        """Reload WireGuard config (for adding/removing peers without restart)."""
-        if self.is_running:
-            self.stop_tunnel()
-            time.sleep(1)
-            return self.start_tunnel(local_ip, listen_port)
-        return False
+        """Reload WireGuard config.
+
+        In hub-and-spoke mode there is nothing to reload when peers join/leave
+        -- the hub config is static (just the hub) and the hub itself handles
+        peer routing. Kept as a no-op to preserve the API surface.
+        """
+        return True
 
     def get_status(self) -> dict:
         """Get WireGuard tunnel status."""
@@ -343,6 +360,10 @@ class VPNEngine:
         self.local_ip: str = ""
         self.listen_port: int = 51820
         self.connected: bool = False
+
+    def set_hub(self, public_key: str, endpoint: str):
+        """Configure the relay hub the tunnel should attach to."""
+        self.wg.set_hub(public_key, endpoint)
 
     def discover_nat(self) -> STUNResult:
         """Run STUN discovery to find public endpoint."""

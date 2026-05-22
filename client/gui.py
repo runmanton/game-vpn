@@ -725,11 +725,25 @@ class GameVPNApp(QMainWindow):
 
     # ─── UI Update Slots ────────────────────────────────────────────────────────
 
+    def _configure_hub(self, hub_info):
+        """Pass relay hub info into the VPN engine before the tunnel starts."""
+        if not self.vpn_engine:
+            return
+        if not hub_info or not hub_info.get("public_key") or not hub_info.get("endpoint"):
+            self.log_signal.emit(
+                "WARNING: signaling server did not return relay hub info; "
+                "VPN tunnel will not be reachable."
+            )
+            return
+        self.vpn_engine.set_hub(hub_info["public_key"], hub_info["endpoint"])
+        self.log_signal.emit(f"Relay hub: {hub_info['endpoint']}")
+
     def _on_room_created(self, response: dict):
         """Room successfully created."""
         room = response.get("room", {})
         self.room_code = room.get("room_code", "")
         self.local_ip = response.get("your_local_ip", "")
+        self._configure_hub(response.get("hub"))
 
         self.room_title_label.setText(f"🎮  {room.get('name', 'Game Room')}")
         self.room_code_label.setText(self.room_code)
@@ -770,6 +784,7 @@ class GameVPNApp(QMainWindow):
         room = response.get("room", {})
         self.room_code = room.get("room_code", "")
         self.local_ip = response.get("your_local_ip", "")
+        self._configure_hub(response.get("hub"))
 
         self.room_title_label.setText(f"🎮  {room.get('name', 'Game Room')}")
         self.room_code_label.setText(self.room_code)

@@ -20,10 +20,12 @@ from typing import Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import hub_client
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("GameVPN-Server")
 
-app = FastAPI(title="GameVPN Signaling Server", version="1.0.0")
+app = FastAPI(title="GameVPN Signaling Server", version="1.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -147,11 +149,16 @@ async def handle_create_room(ws: WebSocket, data: dict) -> dict:
 
     logger.info(f"Room created: {room_code} by {peer.username} (peer={peer_id[:8]})")
 
+    # Register the host's WireGuard key with the hub so the hub can route to it.
+    if peer.public_key:
+        await hub_client.add_peer(peer.public_key, local_ip)
+
     return {
         "type": "room_created",
         "room": room.to_dict(),
         "your_peer_id": peer_id,
         "your_local_ip": local_ip,
+        "hub": await hub_client.fetch_info(),
     }
 
 
@@ -191,6 +198,10 @@ async def handle_join_room(ws: WebSocket, data: dict) -> dict:
 
     logger.info(f"Peer {peer.username} joined room {room_code} (peer={peer_id[:8]})")
 
+    # Register the joiner's WireGuard key with the hub.
+    if peer.public_key:
+        await hub_client.add_peer(peer.public_key, local_ip)
+
     # Notify existing peers about the new joiner
     await broadcast_to_room(room, {
         "type": "peer_joined",
@@ -202,6 +213,7 @@ async def handle_join_room(ws: WebSocket, data: dict) -> dict:
         "room": room.to_dict(),
         "your_peer_id": peer_id,
         "your_local_ip": local_ip,
+        "hub": await hub_client.fetch_info(),
     }
 
 
@@ -243,13 +255,19 @@ async def handle_leave_room(ws: WebSocket, data: dict) -> Optional[dict]:
     room = rooms[room_id]
 
     if peer_id in room.peers:
-        username = room.peers[peer_id].username
+        leaving_peer = room.peers[peer_id]
+        username = leaving_peer.username
+        public_key = leaving_peer.public_key
         del room.peers[peer_id]
 
         if peer_id in peer_connections:
             del peer_connections[peer_id]
 
         logger.info(f"Peer {username} left room {room_code}")
+
+        # Remove the WireGuard registration from the hub.
+        if public_key:
+            await hub_client.remove_peer(public_key)
 
         # Notify others
         await broadcast_to_room(room, {
@@ -339,9 +357,14 @@ async def websocket_endpoint(ws: WebSocket):
             for room_code, room_id in list(code_to_room.items()):
                 room = rooms.get(room_id)
                 if room and connected_peer_id in room.peers:
-                    username = room.peers[connected_peer_id].username
+                    leaving = room.peers[connected_peer_id]
+                    username = leaving.username
+                    public_key = leaving.public_key
                     del room.peers[connected_peer_id]
                     logger.info(f"Peer {username} disconnected from room {room_code}")
+
+                    if public_key:
+                        await hub_client.remove_peer(public_key)
 
                     await broadcast_to_room(room, {
                         "type": "peer_left",
@@ -361,7 +384,12 @@ async def websocket_endpoint(ws: WebSocket):
 
 @app.get("/")
 async def root():
-    return {"service": "GameVPN Signaling Server", "version": "1.0.0", "status": "running"}
+    return {
+        "service": "GameVPN Signaling Server",
+        "version": "1.1.0",
+        "status": "running",
+        "hub_enabled": hub_client.is_enabled(),
+    }
 
 
 @app.get("/rooms")
@@ -401,10 +429,14 @@ async def cleanup_stale_peers():
                 continue
             stale = [pid for pid, p in room.peers.items() if now - p.last_seen > 60]
             for pid in stale:
-                username = room.peers[pid].username
+                stale_peer = room.peers[pid]
+                username = stale_peer.username
+                public_key = stale_peer.public_key
                 del room.peers[pid]
                 peer_connections.pop(pid, None)
                 logger.info(f"Removed stale peer {username} from {room_code}")
+                if public_key:
+                    await hub_client.remove_peer(public_key)
                 await broadcast_to_room(room, {
                     "type": "peer_left",
                     "peer_id": pid,

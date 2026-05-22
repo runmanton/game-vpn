@@ -6,7 +6,7 @@ WORKDIR /app
 COPY server/ ./server/
 COPY run_server.py .
 
-RUN pip install --no-cache-dir fastapi uvicorn[standard] websockets
+RUN pip install --no-cache-dir fastapi uvicorn[standard] websockets httpx
 
 EXPOSE 8765
 
