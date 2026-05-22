@@ -738,6 +738,28 @@ class GameVPNApp(QMainWindow):
         self.vpn_engine.set_hub(hub_info["public_key"], hub_info["endpoint"])
         self.log_signal.emit(f"Relay hub: {hub_info['endpoint']}")
 
+    def _start_tunnel_safe(self):
+        """Start the VPN tunnel; never let an exception propagate out of the slot.
+
+        An uncaught exception inside a Qt slot can take the whole app down on
+        --windowed builds (no console). Surface the failure in the in-app log
+        instead.
+        """
+        if not self.vpn_engine:
+            return
+        self._room_log("Starting VPN tunnel...")
+        try:
+            success = self.vpn_engine.start(self.local_ip)
+        except Exception as exc:
+            self._room_log(f"⚠ VPN tunnel failed: {exc}")
+            self._room_log("Tunnel could not start, but room signaling is OK.")
+            return
+        if success:
+            self._room_log("VPN tunnel active!")
+        else:
+            self._room_log("⚠ VPN tunnel failed — WireGuard may not be installed")
+            self._room_log("Install WireGuard from: https://www.wireguard.com/install/")
+
     def _on_room_created(self, response: dict):
         """Room successfully created."""
         room = response.get("room", {})
@@ -769,15 +791,7 @@ class GameVPNApp(QMainWindow):
         self.statusBar().showMessage(f"Room: {self.room_code} — Share this code with friends!")
         self.ping_timer.start()
 
-        # Start WireGuard tunnel
-        if self.vpn_engine:
-            self.log_signal.emit("Starting VPN tunnel...")
-            success = self.vpn_engine.start(self.local_ip)
-            if success:
-                self._room_log("VPN tunnel active!")
-            else:
-                self._room_log("⚠ VPN tunnel failed — WireGuard may not be installed")
-                self._room_log("Install WireGuard from: https://www.wireguard.com/install/")
+        self._start_tunnel_safe()
 
     def _on_room_joined(self, response: dict):
         """Successfully joined a room."""
@@ -817,14 +831,7 @@ class GameVPNApp(QMainWindow):
         self.statusBar().showMessage(f"Connected to room: {self.room_code}")
         self.ping_timer.start()
 
-        # Start WireGuard tunnel
-        if self.vpn_engine:
-            success = self.vpn_engine.start(self.local_ip)
-            if success:
-                self._room_log("VPN tunnel active!")
-            else:
-                self._room_log("⚠ VPN tunnel failed — WireGuard may not be installed")
-                self._room_log("Install WireGuard from: https://www.wireguard.com/install/")
+        self._start_tunnel_safe()
 
     def _on_peer_joined(self, data: dict):
         """A new peer joined the room."""

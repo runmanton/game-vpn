@@ -17,9 +17,9 @@ logger = logging.getLogger("GameVPN-Hub")
 
 HUB_API_URL = os.environ.get("HUB_API_URL", "").rstrip("/")
 HUB_API_TOKEN = os.environ.get("HUB_API_TOKEN", "")
+HUB_PUBLIC_KEY = os.environ.get("HUB_PUBLIC_KEY", "")
+HUB_ENDPOINT = os.environ.get("HUB_ENDPOINT", "")
 HUB_TIMEOUT = float(os.environ.get("HUB_API_TIMEOUT", "5"))
-
-_info_cache: Optional[dict] = None
 
 
 def is_enabled() -> bool:
@@ -27,19 +27,24 @@ def is_enabled() -> bool:
 
 
 async def fetch_info() -> Optional[dict]:
-    """Fetch hub public key + endpoint. Cached after first successful call."""
-    global _info_cache
-    if _info_cache:
-        return _info_cache
+    """Return hub public key + endpoint for clients to attach to.
+
+    Pulls from HUB_PUBLIC_KEY + HUB_ENDPOINT env vars if set (preferred --
+    avoids a per-room HTTP round-trip and degrades to None instead of
+    crashing the client when the hub is briefly unreachable). Falls back
+    to GET {HUB_API_URL}/info if the env vars are missing.
+    """
+    if HUB_PUBLIC_KEY and HUB_ENDPOINT:
+        return {"public_key": HUB_PUBLIC_KEY, "endpoint": HUB_ENDPOINT}
     if not HUB_API_URL:
         return None
     try:
         async with httpx.AsyncClient(timeout=HUB_TIMEOUT) as client:
             r = await client.get(f"{HUB_API_URL}/info")
             r.raise_for_status()
-            _info_cache = r.json()
-            logger.info(f"Hub info loaded: endpoint={_info_cache.get('endpoint')}")
-            return _info_cache
+            data = r.json()
+            logger.info(f"Hub info fetched live: endpoint={data.get('endpoint')}")
+            return data
     except Exception as e:
         logger.warning(f"Failed to fetch hub /info: {e}")
         return None
