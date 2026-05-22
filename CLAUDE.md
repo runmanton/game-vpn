@@ -52,10 +52,9 @@ game-vpn/
 │   └── license.txt             # MIT License
 ├── run_client.py               # Client entry point
 ├── run_server.py               # Server entry point
-├── build_exe.py                # PyInstaller build script
-├── BUILD.bat                   # Build GameVPN.exe only
 ├── BUILD_INSTALLER.bat         # Build full installer (exe + WireGuard + PDF)
 ├── INSTALL_AND_RUN.bat         # Quick install dependencies & run
+├── PUSH_TO_GITHUB.bat          # Push project to GitHub
 ├── Dockerfile                  # Docker deploy for signaling server
 ├── requirements.txt            # Python dependencies
 ├── GameVPN_Manual.pdf          # User manual (Vietnamese)

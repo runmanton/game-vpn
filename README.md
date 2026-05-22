@@ -93,14 +93,14 @@ docker run -p 8765:8765 gamevpn-server
 
 ---
 
-## Build file .EXE (chia sẻ cho bạn bè không cần cài Python)
+## Build installer (chia sẻ cho bạn bè không cần cài Python)
 
-```bash
-pip install pyinstaller
-python build_exe.py
-```
+Chạy `BUILD_INSTALLER.bat` (yêu cầu Python 3.10+ và Inno Setup 6). Script sẽ:
+1. Build `dist/GameVPN.exe` bằng PyInstaller
+2. Tải WireGuard MSI
+3. Đóng gói thành `installer/output/GameVPN_Setup.exe` bằng Inno Setup
 
-File `dist/GameVPN.exe` có thể gửi cho bạn bè, chạy trực tiếp không cần cài đặt gì.
+Gửi `GameVPN_Setup.exe` cho bạn bè — họ chỉ cần double-click và Next.
 
 ---
 
@@ -108,19 +108,24 @@ File `dist/GameVPN.exe` có thể gửi cho bạn bè, chạy trực tiếp khô
 
 ```
 game-vpn/
-├── run_client.py        # Khởi chạy app client
-├── run_server.py        # Khởi chạy signaling server
-├── build_exe.py         # Build thành file .exe
-├── requirements.txt     # Dependencies
-├── Dockerfile           # Docker cho server
+├── run_client.py            # Khởi chạy app client
+├── run_server.py            # Khởi chạy signaling server
+├── BUILD_INSTALLER.bat      # Build installer (.exe + WireGuard + PDF)
+├── INSTALL_AND_RUN.bat      # Cài deps & chạy từ source
+├── PUSH_TO_GITHUB.bat       # Push code lên GitHub
+├── requirements.txt         # Dependencies
+├── Dockerfile               # Docker cho server
 ├── client/
-│   ├── gui.py           # Giao diện PyQt6
-│   └── vpn_client.py    # WebSocket client
+│   ├── gui.py               # Giao diện PyQt6
+│   └── vpn_client.py        # WebSocket client
 ├── engine/
-│   └── vpn_engine.py    # WireGuard + STUN + Relay
+│   └── vpn_engine.py        # WireGuard + STUN + Relay
 ├── server/
 │   └── signaling_server.py  # FastAPI signaling server
-└── assets/              # Icons, images
+├── installer/
+│   ├── GameVPN_Setup.iss    # Inno Setup script
+│   └── license.txt          # MIT License
+└── assets/                  # Icons, images
 ```
 
 ---

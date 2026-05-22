@@ -10,8 +10,8 @@
 
 #define MyAppName "GameVPN"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "GameVPN"
-#define MyAppURL "https://github.com/gamevpn"
+#define MyAppPublisher "Luong Manh Tuan"
+#define MyAppURL "https://github.com/runmanton/game-vpn"
 #define MyAppExeName "GameVPN.exe"
 
 [Setup]
@@ -43,8 +43,8 @@ SetupLogging=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: checked
-Name: "installwireguard"; Description: "Install WireGuard (required for VPN tunnel)"; GroupDescription: "Components:"; Flags: checked
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
+Name: "installwireguard"; Description: "Install WireGuard (required for VPN tunnel)"; GroupDescription: "Components:"
 
 [Files]
 ; GameVPN application

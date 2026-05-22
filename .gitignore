@@ -6,6 +6,10 @@ dist/
 build/
 *.spec
 
+# Build logs
+pip.log
+pyinstaller.log
+
 # Installer output
 installer/output/
 installer/wireguard-amd64.msi
