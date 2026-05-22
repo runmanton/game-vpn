@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.spec
+
+# Installer output
+installer/output/
+installer/wireguard-amd64.msi
+installer/wizard_image.bmp
+installer/wizard_small.bmp
+assets/icon.ico
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
