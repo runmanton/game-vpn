@@ -9,7 +9,7 @@
 ; ============================================================
 
 #define MyAppName "GameVPN"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Luong Manh Tuan"
 #define MyAppURL "https://github.com/runmanton/game-vpn"
 #define MyAppExeName "GameVPN.exe"
@@ -38,6 +38,13 @@ WizardSmallImageFile=wizard_small.bmp
 UninstallDisplayIcon={app}\{#MyAppExeName}
 DisableWelcomePage=no
 SetupLogging=yes
+; Smooth upgrade-in-place: auto-close running GameVPN, reuse previous install dir,
+; and skip prompts that would otherwise ask the user to confirm the overwrite.
+CloseApplications=yes
+RestartApplications=no
+UsePreviousAppDir=yes
+UsePreviousTasks=yes
+UsePreviousLanguage=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
