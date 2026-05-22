@@ -24,6 +24,9 @@ from PyQt6.QtGui import QFont, QColor, QIcon, QPalette, QPixmap, QAction
 
 logger = logging.getLogger("GameVPN-GUI")
 
+# Production signaling server (hardcoded so end users do not need to type it).
+DEFAULT_SERVER_URL = "wss://gamevpn-tuan.onrender.com/ws"
+
 # ─── Styles ─────────────────────────────────────────────────────────────────────
 
 DARK_STYLE = """
@@ -330,16 +333,9 @@ class GameVPNApp(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setSpacing(15)
 
-        # ── Server Settings ──
-        server_group = QGroupBox("Server Connection")
-        server_layout = QHBoxLayout(server_group)
-
-        server_layout.addWidget(QLabel("Server URL:"))
-        self.server_input = QLineEdit("ws://localhost:8765/ws")
-        self.server_input.setPlaceholderText("ws://your-server:8765/ws")
-        server_layout.addWidget(self.server_input, stretch=1)
-
-        layout.addWidget(server_group)
+        # Server URL is hardcoded so end users don't need to type it.
+        # Kept as a widget (not added to layout) so existing read sites still work.
+        self.server_input = QLineEdit(DEFAULT_SERVER_URL)
 
         # ── Player Info ──
         player_group = QGroupBox("Player Info")
@@ -453,7 +449,7 @@ class GameVPNApp(QMainWindow):
         code_layout.addWidget(self.room_code_label)
 
         self.copy_code_btn = QPushButton("📋 Copy")
-        self.copy_code_btn.setFixedWidth(80)
+        self.copy_code_btn.setMinimumWidth(110)
         self.copy_code_btn.clicked.connect(self._copy_room_code)
         code_layout.addWidget(self.copy_code_btn)
         code_layout.addStretch()

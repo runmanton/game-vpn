@@ -85,7 +85,7 @@ if exist "dist" rmdir /s /q "dist"
 if exist "build" rmdir /s /q "build"
 
 echo   Running PyInstaller (log: pyinstaller.log)...
-pyinstaller --name=GameVPN --onefile --windowed --noconfirm --clean --add-data "engine;engine" --add-data "client;client" --hidden-import=websockets --hidden-import=websockets.legacy --hidden-import=websockets.legacy.client --hidden-import=PyQt6.QtWidgets --hidden-import=PyQt6.QtCore --hidden-import=PyQt6.QtGui --hidden-import=asyncio --hidden-import=json --hidden-import=secrets --hidden-import=struct --hidden-import=socket run_client.py > pyinstaller.log 2>&1
+pyinstaller --name=GameVPN --onefile --windowed --noconfirm --clean --uac-admin --icon=assets/icon.ico --add-data "engine;engine" --add-data "client;client" --hidden-import=websockets --hidden-import=websockets.legacy --hidden-import=websockets.legacy.client --hidden-import=PyQt6.QtWidgets --hidden-import=PyQt6.QtCore --hidden-import=PyQt6.QtGui --hidden-import=asyncio --hidden-import=json --hidden-import=secrets --hidden-import=struct --hidden-import=socket run_client.py > pyinstaller.log 2>&1
 
 if not exist "dist\GameVPN.exe" (
     echo   [ERROR] PyInstaller build failed! See pyinstaller.log for details.
