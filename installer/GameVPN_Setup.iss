@@ -116,3 +116,15 @@ begin
     Result := False;
   end;
 end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  // Force-close any running GameVPN.exe so upgrade-in-place never trips on a
+  // locked file. /F is safe here: closing the GUI does not tear down the
+  // WireGuard tunnel service, which the new app can re-attach to.
+  Exec(ExpandConstant('{cmd}'), '/C taskkill /IM GameVPN.exe /F /T',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := '';
+end;
