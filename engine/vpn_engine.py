@@ -22,6 +22,11 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger("GameVPN-Engine")
 
+# On Windows, subprocess.run() flashes a console window by default when the
+# parent process has no console (PyInstaller --windowed). CREATE_NO_WINDOW
+# keeps these helper invocations silent.
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
 
 # ─── WireGuard Key Management ──────────────────────────────────────────────────
 
@@ -34,9 +39,11 @@ class WireGuardKeys:
     def generate() -> "WireGuardKeys":
         """Generate a WireGuard keypair using the wg command."""
         try:
-            private = subprocess.check_output(["wg", "genkey"], text=True).strip()
+            private = subprocess.check_output(
+                ["wg", "genkey"], text=True, creationflags=NO_WINDOW
+            ).strip()
             public = subprocess.check_output(
-                ["wg", "pubkey"], input=private, text=True
+                ["wg", "pubkey"], input=private, text=True, creationflags=NO_WINDOW
             ).strip()
             return WireGuardKeys(private_key=private, public_key=public)
         except FileNotFoundError:
@@ -198,7 +205,8 @@ class WireGuardManager:
         # Try PATH
         try:
             result = subprocess.run(
-                ["where", "wireguard"], capture_output=True, text=True
+                ["where", "wireguard"], capture_output=True, text=True,
+                creationflags=NO_WINDOW,
             )
             if result.returncode == 0:
                 return result.stdout.strip().split("\n")[0]
@@ -268,6 +276,7 @@ AllowedIPs = {allowed_ips}
             subprocess.run(
                 [wg_path, "/installtunnelservice", str(self.config_path)],
                 check=True, capture_output=True, text=True,
+                creationflags=NO_WINDOW,
             )
             self.is_running = True
             logger.info(f"WireGuard tunnel '{self.interface_name}' started on {local_ip}")
@@ -286,6 +295,7 @@ AllowedIPs = {allowed_ips}
             subprocess.run(
                 [wg_path, "/uninstalltunnelservice", self.interface_name],
                 check=True, capture_output=True, text=True,
+                creationflags=NO_WINDOW,
             )
             self.is_running = False
             logger.info(f"WireGuard tunnel '{self.interface_name}' stopped")
@@ -308,6 +318,7 @@ AllowedIPs = {allowed_ips}
             result = subprocess.run(
                 ["wg", "show", self.interface_name],
                 capture_output=True, text=True,
+                creationflags=NO_WINDOW,
             )
             if result.returncode == 0:
                 return {"running": True, "output": result.stdout}
@@ -399,6 +410,7 @@ class VPNEngine:
                 result = subprocess.run(
                     ["ping", "-n", "1", "-w", str(int(timeout * 1000)), peer_ip],
                     capture_output=True, text=True, timeout=timeout + 1,
+                    creationflags=NO_WINDOW,
                 )
             else:
                 result = subprocess.run(
