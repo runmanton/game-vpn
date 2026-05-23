@@ -28,6 +28,21 @@ logger = logging.getLogger("GameVPN-Engine")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
+def _find_wg_tool() -> str:
+    """Locate the `wg` binary. Falls back to PATH if not in a known location."""
+    if sys.platform == "win32":
+        for p in (
+            r"C:\Program Files\WireGuard\wg.exe",
+            r"C:\Program Files (x86)\WireGuard\wg.exe",
+        ):
+            if os.path.exists(p):
+                return p
+    return "wg"
+
+
+WG_TOOL = _find_wg_tool()
+
+
 # ─── WireGuard Key Management ──────────────────────────────────────────────────
 
 @dataclass
@@ -40,19 +55,22 @@ class WireGuardKeys:
         """Generate a WireGuard keypair using the wg command."""
         try:
             private = subprocess.check_output(
-                ["wg", "genkey"], text=True, creationflags=NO_WINDOW
+                [WG_TOOL, "genkey"], text=True, creationflags=NO_WINDOW
             ).strip()
             public = subprocess.check_output(
-                ["wg", "pubkey"], input=private, text=True, creationflags=NO_WINDOW
+                [WG_TOOL, "pubkey"], input=private, text=True, creationflags=NO_WINDOW
             ).strip()
             return WireGuardKeys(private_key=private, public_key=public)
         except FileNotFoundError:
-            logger.warning("WireGuard not found, generating placeholder keys")
-            # Fallback: generate base64-encoded random keys for development
-            import base64
-            private = base64.b64encode(secrets.token_bytes(32)).decode()
-            public = base64.b64encode(secrets.token_bytes(32)).decode()
-            return WireGuardKeys(private_key=private, public_key=public)
+            # No real wg available. The previous behavior silently generated
+            # random base64 blobs as a "fallback" -- that's catastrophic on
+            # the production path because the private key no longer
+            # corresponds to the public key, so handshakes with the hub fail
+            # silently. Raise instead so the GUI can surface a clear error.
+            raise RuntimeError(
+                "WireGuard CLI (wg.exe) not found. Install WireGuard from "
+                "https://www.wireguard.com/install/ and reopen GameVPN."
+            )
 
 
 # ─── STUN Client (NAT Traversal) ───────────────────────────────────────────────
@@ -333,7 +351,7 @@ class WireGuardManager:
         """Get WireGuard tunnel status."""
         try:
             result = subprocess.run(
-                ["wg", "show", self.interface_name],
+                [WG_TOOL, "show", self.interface_name],
                 capture_output=True, text=True,
                 creationflags=NO_WINDOW,
             )
