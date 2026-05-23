@@ -757,8 +757,12 @@ class GameVPNApp(QMainWindow):
         if success:
             self._room_log("VPN tunnel active!")
         else:
-            self._room_log("⚠ VPN tunnel failed — WireGuard may not be installed")
-            self._room_log("Install WireGuard from: https://www.wireguard.com/install/")
+            err = self.vpn_engine.get_last_error() if self.vpn_engine else ""
+            if err:
+                self._room_log(f"⚠ VPN tunnel failed: {err}")
+            else:
+                self._room_log("⚠ VPN tunnel failed (no details).")
+            self._room_log("Try running GameVPN as Administrator (right-click -> Run as administrator).")
 
     def _on_room_created(self, response: dict):
         """Room successfully created."""

@@ -225,6 +225,7 @@ class WireGuardManager:
         self.peers: dict[str, dict] = {}
         self.hub_public_key: str = ""
         self.hub_endpoint: str = ""
+        self.last_error: str = ""
 
     def set_hub(self, public_key: str, endpoint: str):
         self.hub_public_key = public_key
@@ -307,23 +308,36 @@ class WireGuardManager:
         """Start WireGuard tunnel."""
         wg_path = self._find_wireguard()
         if not wg_path:
-            logger.error("WireGuard not installed! Please install from https://www.wireguard.com/install/")
+            self.last_error = (
+                "WireGuard not installed. Get it from https://www.wireguard.com/install/"
+            )
+            logger.error(self.last_error)
             return False
 
         self.write_config(local_ip, listen_port)
 
+        # Best-effort tear-down of any GameVPN service left over from a
+        # previous (possibly crashed) session -- /installtunnelservice will
+        # refuse to overwrite an existing service of the same name.
+        subprocess.run(
+            [wg_path, "/uninstalltunnelservice", self.interface_name],
+            capture_output=True, text=True, creationflags=NO_WINDOW,
+        )
+
         try:
-            # Install and start the tunnel service
             subprocess.run(
                 [wg_path, "/installtunnelservice", str(self.config_path)],
                 check=True, capture_output=True, text=True,
                 creationflags=NO_WINDOW,
             )
             self.is_running = True
+            self.last_error = ""
             logger.info(f"WireGuard tunnel '{self.interface_name}' started on {local_ip}")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to start WireGuard: {e.stderr}")
+            err = (e.stderr or e.stdout or str(e)).strip()
+            self.last_error = f"wireguard.exe /installtunnelservice failed: {err}"
+            logger.error(self.last_error)
             return False
 
     def stop_tunnel(self) -> bool:
@@ -389,6 +403,9 @@ class VPNEngine:
     def set_hub(self, public_key: str, endpoint: str):
         """Configure the relay hub the tunnel should attach to."""
         self.wg.set_hub(public_key, endpoint)
+
+    def get_last_error(self) -> str:
+        return self.wg.last_error
 
     def discover_nat(self) -> STUNResult:
         """Run STUN discovery to find public endpoint.
