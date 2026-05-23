@@ -125,10 +125,17 @@ def stun_discover(local_port: int = 0) -> STUNResult:
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(3)
-    if local_port:
-        sock.bind(("0.0.0.0", local_port))
-    else:
-        sock.bind(("0.0.0.0", 0))
+    try:
+        if local_port:
+            sock.bind(("0.0.0.0", local_port))
+        else:
+            sock.bind(("0.0.0.0", 0))
+    except OSError as e:
+        # Most often WinError 10048 (port in use). STUN is non-critical in
+        # hub mode, so just give up gracefully instead of crashing the join.
+        logger.warning(f"STUN socket bind failed ({e}); skipping NAT discovery.")
+        sock.close()
+        return result
 
     result.local_port = sock.getsockname()[1]
 
@@ -384,9 +391,16 @@ class VPNEngine:
         self.wg.set_hub(public_key, endpoint)
 
     def discover_nat(self) -> STUNResult:
-        """Run STUN discovery to find public endpoint."""
+        """Run STUN discovery to find public endpoint.
+
+        Uses an ephemeral local port (0 = let the OS pick). In hub-and-spoke
+        mode STUN is purely informational (we display NAT type in the UI);
+        it does NOT need to share a port with the WireGuard service. Binding
+        to listen_port (51820) here was causing WinError 10048 whenever a
+        prior session's WireGuard tunnel was still holding the port.
+        """
         logger.info("Running STUN NAT discovery...")
-        self.stun_result = stun_discover(self.listen_port)
+        self.stun_result = stun_discover(0)
         logger.info(
             f"STUN result: {self.stun_result.public_ip}:{self.stun_result.public_port} "
             f"(NAT type: {self.stun_result.nat_type})"
