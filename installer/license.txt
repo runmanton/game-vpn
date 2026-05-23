@@ -1,5 +1,4 @@
 GameVPN - Virtual LAN for Gaming
-Version 1.0.0
 
 MIT License
 
