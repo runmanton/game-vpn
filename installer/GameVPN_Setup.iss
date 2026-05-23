@@ -9,7 +9,7 @@
 ; ============================================================
 
 #define MyAppName "GameVPN"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 #define MyAppPublisher "Luong Manh Tuan"
 #define MyAppURL "https://github.com/runmanton/game-vpn"
 #define MyAppExeName "GameVPN.exe"
